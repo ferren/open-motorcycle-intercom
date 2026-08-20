@@ -41,6 +41,10 @@ static const char *TAG = "omi";
  * 0 = normal VOX behavior (DTX silence suppression active), 1 = force continuous TX. */
 #define FORCE_TX_ALWAYS_FOR_TEST 1
 
+/* Bench-test knob: route the encoded microphone stream through the local Opus
+ * decoder and I2S speaker output. Set to 0 for normal mesh operation. */
+#define LOCAL_AUDIO_LOOPBACK_FOR_TEST 1
+
 /* RTT log cadence while using nRF transport */
 #define RTT_LOG_INTERVAL_MS 10000
 
@@ -387,8 +391,10 @@ void app_main(void)
     }
     ESP_LOGI(TAG, "Audio test flags: force_tx_always=%s", FORCE_TX_ALWAYS_FOR_TEST ? "YES" : "no");
 
-    /* Configure audio for mesh mode */
-    ret = audio_set_mode(AUDIO_MODE_MESH);
+    /* Keep the hardware-validation build self-contained. In loopback mode the
+     * capture task queues each encoded frame to the local decoder rather than
+     * sending it to a remote mesh peer. */
+    ret = audio_set_mode(LOCAL_AUDIO_LOOPBACK_FOR_TEST ? AUDIO_MODE_LOOPBACK : AUDIO_MODE_MESH);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to set audio mode: %s", esp_err_to_name(ret));
         goto error_halt;
@@ -420,7 +426,8 @@ void app_main(void)
 
     /* Start audio pipeline */
     ESP_LOGI(TAG, "");
-    ESP_LOGI(TAG, "Starting audio pipeline (mesh mode)...");
+    ESP_LOGI(TAG, "Starting audio pipeline (%s mode)...",
+             LOCAL_AUDIO_LOOPBACK_FOR_TEST ? "local loopback" : "mesh");
     ESP_LOGI(TAG, "");
 
     /* Queue startup notification; the audio task owns generation and I2S playback. */
