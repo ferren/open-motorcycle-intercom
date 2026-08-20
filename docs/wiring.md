@@ -98,15 +98,18 @@ The MAX98357A is a mono I2S Class-D amplifier. It connects to the ESP32-S3 via t
 | **LRC**       | **GPIO 5**   | WS (Word Select) | Left/Right Clock |
 | **BCLK**      | **GPIO 4**   | SCK (Bit Clock) | Serial Clock |
 | **DIN**       | **GPIO 7**   | DOUT (Data Out) | Audio Data |
-| **GAIN**      | **GND**      | Gain Setting | Sets +9dB gain (adjust as needed) |
-| **SD**        | **Floating** | Shutdown / Channel | Left + Right / 2 (Mono Mix) |
+| **GAIN**      | **GND**      | Gain Setting | Sets +12 dB gain |
+| **SD**        | **VIN**      | Shutdown / Channel | Holds the amplifier enabled and selects one I2S channel |
 | **GND**       | **GND**      | Ground | Common Ground |
 | **VIN**       | **5V** or 3.3V | Power | 5V recommended for full 3W power |
 
 **Notes:**
 - If your board has a "5V" pin, use it for VIN to get louder audio.
 - If using 3.3V, audio power will be limited to ~0.5W.
-- The **SD** pin can be connected to VCC or GND to change channel selection, but leaving it floating selects "Left/2 + Right/2" which is perfect for mono mix.
+- Connect **SD** directly to **VIN** for this prototype.  A bare breakout's
+  floating SD_MODE pin can be read as shutdown; VIN is a reliable enabled state.
+  It selects one I2S channel, but that is harmless because the firmware writes
+  the same sample to both output slots.  Do not connect SD to GND.
 
 Connect SPK+ and SPK- to your speaker. Speaker impedance should be 4-8 Ohms,
 and the speaker should be 0.5W to 3W for best results.
