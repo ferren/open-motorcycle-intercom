@@ -29,7 +29,7 @@ def _health_line(s: PortStats) -> str:
         issues.append(f"esp_tx_overwr+{audio_d['tx_overwr']}")
 
     glitch_d = s.delta("glitch")
-    for k in ("glitches", "rx_und", "adc_overruns"):
+    for k in ("glitches", "rx_und", "i2s_read_errors"):
         if glitch_d.get(k, 0) > 0:
             issues.append(f"esp_{k}+{glitch_d[k]}")
 

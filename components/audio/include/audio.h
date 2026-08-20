@@ -3,8 +3,8 @@
  * @brief OMI Audio Subsystem Interface
  *
  * This component handles:
- * - Microphone capture (ADC continuous mode, MAX9814 analog mic)
- * - Speaker output (I2S TX to the PCM5102A DAC)
+ * - Microphone capture (I2S RX from an INMP441 digital microphone)
+ * - Speaker output (I2S TX to a PCM5102A DAC or MAX98357A amplifier)
  * - Opus encode/decode
  * - VOX detection
  * - Packet-store and adaptive PCM playout
@@ -26,17 +26,15 @@ extern "C" {
 /*
  * I2S GPIO Pin Definitions
  *
- * The I2S bus only drives the speaker DAC; the microphone is sampled by the
- * ADC (see audio_adc_config_t).
+ * The I2S bus is full-duplex: the microphone drives DIN while the ESP32-S3
+ * drives BCLK, WS, and DOUT for the speaker output.
  *   - BCLK (bit clock):  GPIO 4
  *   - WS (word select):  GPIO 5
  *   - DOUT (data out):   GPIO 7 - to the PCM5102A DAC
  */
 #define AUDIO_I2S_BCLK_GPIO 4 /**< I2S bit clock GPIO */
 #define AUDIO_I2S_WS_GPIO   5 /**< I2S word select (LRCLK) GPIO */
-/* FIXME(api): DIN is unused; capture moved to the ADC. Remove this constant
- * and audio_i2s_pins_t.din_gpio together on the next config change. */
-#define AUDIO_I2S_DIN_GPIO  6 /**< Unused I2S data-in GPIO */
+#define AUDIO_I2S_DIN_GPIO  6 /**< I2S data in (from INMP441 SD) */
 #define AUDIO_I2S_DOUT_GPIO 7 /**< I2S data out (to speaker) GPIO */
 
 /** Matches the mesh grant limit while keeping audio independent of mesh headers. */
@@ -48,7 +46,7 @@ extern "C" {
 typedef struct {
     int bclk_gpio; /**< Bit clock GPIO */
     int ws_gpio;   /**< Word select (LRCLK) GPIO */
-    int din_gpio;  /**< Unused; the microphone is sampled by the ADC */
+    int din_gpio;  /**< Data in (from the microphone) */
     int dout_gpio; /**< Data out GPIO (speaker) */
 } audio_i2s_pins_t;
 
@@ -61,25 +59,6 @@ typedef struct {
         .ws_gpio = AUDIO_I2S_WS_GPIO,                                                              \
         .din_gpio = AUDIO_I2S_DIN_GPIO,                                                            \
         .dout_gpio = AUDIO_I2S_DOUT_GPIO,                                                          \
-    }
-
-/**
- * @brief ADC configuration for analog microphone
- */
-typedef struct {
-    int adc_channel; /**< ADC channel (default: ADC_CHANNEL_0 = GPIO1) */
-    int adc_unit;    /**< ADC unit (default: ADC_UNIT_1) */
-    int adc_atten;   /**< Attenuation (default: ADC_ATTEN_DB_12) */
-} audio_adc_config_t;
-
-/**
- * @brief Default ADC configuration
- */
-#define AUDIO_ADC_CONFIG_DEFAULT()                                                                 \
-    {                                                                                              \
-        .adc_channel = 0, /* ADC1_CHANNEL_0 = GPIO1 */                                             \
-        .adc_unit = 1,    /* ADC_UNIT_1 */                                                         \
-        .adc_atten = 3,   /* ADC_ATTEN_DB_12 - full 3.3V range for MAX9814 active mic */           \
     }
 
 /**
@@ -141,7 +120,6 @@ typedef struct {
     uint16_t frame_size_ms;        /**< Frame size in ms (default: 20) */
     uint32_t opus_bitrate;         /**< Opus bitrate in bps (default: 12000) */
     audio_i2s_pins_t i2s_pins;     /**< I2S GPIO pin configuration */
-    audio_adc_config_t adc_config; /**< ADC configuration for mic input */
     audio_vox_config_t vox_config; /**< VOX detection configuration */
     bool enable_hpf;               /**< Enable high-pass filter */
     float hpf_cutoff_hz;           /**< HPF cutoff frequency (default: 80 Hz) */
@@ -160,7 +138,6 @@ typedef struct {
         .frame_size_ms = 20,        \
         .opus_bitrate = 12000,      \
         .i2s_pins = AUDIO_I2S_PINS_DEFAULT(), \
-        .adc_config = AUDIO_ADC_CONFIG_DEFAULT(), \
         .vox_config = AUDIO_VOX_CONFIG_DEFAULT(), \
         .enable_hpf = true,         \
         .hpf_cutoff_hz = 80.0f,     \
@@ -216,11 +193,11 @@ typedef struct {
     uint8_t rx_q_depth_avg;      /**< Average observed RX queue depth */
     uint8_t rx_q_depth_max;      /**< Maximum observed RX queue depth */
     uint32_t task_loops;         /**< Audio task loop count (health indicator) */
-    uint32_t adc_overruns;       /**< ADC buffer overrun count */
+    uint32_t i2s_read_errors;    /**< I2S microphone read errors */
     uint32_t tx_dtx_suppressed;  /**< Silence frames dropped before transmit (DTX) */
-    uint32_t capture_frames_ok;  /**< Complete ADC capture frames */
-    uint32_t capture_short_reads; /**< Partial ADC capture frames */
-    uint32_t capture_timeouts;   /**< ADC notification/read timeouts */
+    uint32_t capture_frames_ok;  /**< Complete I2S microphone frames */
+    uint32_t capture_short_reads; /**< Partial I2S microphone frames */
+    uint32_t capture_timeouts;   /**< I2S microphone read timeouts */
     uint32_t encode_errors;      /**< Opus encode failures */
     uint32_t decode_errors;      /**< Opus decode and PLC failures */
     uint32_t rx_queue_overflows; /**< Frames rejected because the playback queue was full */

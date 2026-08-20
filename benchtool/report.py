@@ -271,13 +271,13 @@ def _playback_lines(s: PortStats, duration: int) -> list[str]:
         m, d = s.last_glitch, s.delta("glitch")
         out.append(
             f"  Last GlitchStats: glitches={m['glitches']} rx_und={m['rx_und']} "
-            f"i2s_inc={m['i2s_inc']} adc_overruns={m['adc_overruns']}"
+            f"i2s_inc={m['i2s_inc']} i2s_read_errors={m['i2s_read_errors']}"
         )
         if d:
             out.append(
                 f"  Delta GlitchStats: glitches={d.get('glitches', 0)} "
                 f"rx_und={d.get('rx_und', 0)} i2s_inc={d.get('i2s_inc', 0)} "
-                f"adc_overruns={d.get('adc_overruns', 0)} "
+                f"i2s_read_errors={d.get('i2s_read_errors', 0)} "
                 f"(glitches/min={_rate_per_min(d.get('glitches', 0), duration)})"
             )
     if s.last_conceal:

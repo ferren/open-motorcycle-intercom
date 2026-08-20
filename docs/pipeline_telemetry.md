@@ -24,7 +24,7 @@ negative delta.
 
 | Device | Stage | Boundary |
 |---|---|---|
-| ESP | `audio` | ADC capture through Opus and I2S playback |
+| ESP | `audio` | INMP441 I2S capture through Opus and I2S playback |
 | ESP | `transport` | Audio callback through bridge RX and playback queue |
 | ESP | `spi` | ESP bridge queue, framing, parser, and ACK handling |
 | nRF | `spi` | SPI ingress admission and nRF-to-ESP transactions |

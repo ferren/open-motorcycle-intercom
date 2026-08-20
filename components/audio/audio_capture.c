@@ -1,6 +1,6 @@
 /**
  * @file audio_capture.c
- * @brief Capture task: ADC read, DSP chain, VOX, Opus encode, TX handoff.
+ * @brief Capture task: I2S read, DSP chain, VOX, Opus encode, TX handoff.
  */
 
 #include "audio_internal.h"
@@ -10,9 +10,6 @@
 
 #include "esp_log.h"
 #include "esp_timer.h"
-#include "hal/adc_types.h"
-#include "soc/soc.h"
-
 static const char *TAG = "audio";
 
 static void hpf_init(audio_hpf_state_t *state, float cutoff_hz, float sample_rate)
@@ -52,39 +49,20 @@ static void hpf_process(audio_hpf_state_t *state, int16_t *samples, size_t count
 
 void audio_capture_init_dsp(void)
 {
-    g_audio.dc_estimate = 0.0f;
-    g_audio.lpf_prev = 0;
     hpf_init(&g_audio.hpf, g_audio.config.hpf_cutoff_hz, g_audio.config.sample_rate);
     vox_init(&g_audio.vox, &g_audio.config.vox_config);
     voice_cleanup_init(&g_audio.voice_cleanup);
 }
 
-/* Oversampled 12-bit ADC data becomes one centered, low-pass-filtered PCM frame. */
-static void convert_adc_frame(const uint8_t *adc_buffer, size_t adc_samples)
+/* The INMP441's 24-bit left-channel I2S words become signed 16-bit PCM. */
+static void convert_i2s_frame(const int32_t *i2s_buffer, size_t frame_samples)
 {
     for (size_t i = 0; i < AUDIO_FRAME_SAMPLES; ++i) {
-        int32_t sum = 0;
-        size_t valid = 0;
-        for (size_t j = 0; j < ADC_OVERSAMPLE_FACTOR; ++j) {
-            size_t index = i * ADC_OVERSAMPLE_FACTOR + j;
-            if (index < adc_samples) {
-                const adc_digi_output_data_t *sample =
-                    (const adc_digi_output_data_t *)&adc_buffer[index *
-                                                                SOC_ADC_DIGI_RESULT_BYTES];
-                sum += sample->type2.data;
-                valid++;
-            }
-        }
-        if (valid == 0) {
+        if (i >= frame_samples) {
             g_audio.pcm_input[i] = 0;
             continue;
         }
-        int16_t sample = (int16_t)(((sum / (int32_t)valid) - 2048) * 8);
-        g_audio.dc_estimate = g_audio.dc_estimate * 0.999f + (float)sample * 0.001f;
-        sample -= (int16_t)g_audio.dc_estimate;
-        sample = (int16_t)((g_audio.lpf_prev * 3 + sample) / 4);
-        g_audio.lpf_prev = sample;
-        g_audio.pcm_input[i] = sample;
+        g_audio.pcm_input[i] = (int16_t)(i2s_buffer[i * I2S_CAPTURE_CHANNELS] >> 16);
     }
 }
 
@@ -199,7 +177,6 @@ static void record_frame_latency(int64_t frame_start_us, int64_t *latency_sum,
 
 static void capture_task_finish(void)
 {
-    atomic_store_explicit(&g_audio.adc_notify_task, NULL, memory_order_release);
     portENTER_CRITICAL(&g_audio_task_lock);
     g_audio.capture_task = NULL;
     portEXIT_CRITICAL(&g_audio_task_lock);
@@ -208,38 +185,26 @@ static void capture_task_finish(void)
 }
 
 /* Returns the number of bytes read, or 0 when this loop iteration has no frame. */
-static uint32_t read_adc_frame(uint8_t *adc_buffer, size_t buffer_size)
+static size_t read_i2s_frame(int32_t *i2s_buffer, size_t buffer_size)
 {
-    bool notified = ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(ADC_READ_TIMEOUT_MS)) != 0;
-    if (!atomic_load_explicit(&g_audio.running, memory_order_acquire)) {
-        return 0;
-    }
-    if (!notified) {
+    size_t bytes_read = 0;
+    esp_err_t ret = i2s_channel_read(g_audio.rx_chan, i2s_buffer, buffer_size,
+                                     &bytes_read, I2S_READ_TIMEOUT_MS);
+    if (ret == ESP_ERR_TIMEOUT) {
         AUDIO_STATS_LOCK();
         g_audio.stats.capture_timeouts++;
         AUDIO_STATS_UNLOCK();
-    }
-
-    uint32_t bytes_read = 0;
-    esp_err_t ret = adc_continuous_read(g_audio.adc_handle, adc_buffer, buffer_size,
-                                        &bytes_read, 0);
-    if (ret == ESP_ERR_TIMEOUT) {
-        if (notified) {
-            AUDIO_STATS_LOCK();
-            g_audio.stats.capture_timeouts++;
-            AUDIO_STATS_UNLOCK();
-        }
         return 0;
     }
     if (ret != ESP_OK || bytes_read == 0) {
         AUDIO_STATS_LOCK();
-        g_audio.stats.adc_overruns++;
+        g_audio.stats.i2s_read_errors++;
         AUDIO_STATS_UNLOCK();
-        ESP_LOGW(TAG, "ADC read error: %s", esp_err_to_name(ret));
+        ESP_LOGW(TAG, "I2S microphone read error: %s", esp_err_to_name(ret));
         return 0;
     }
     AUDIO_STATS_LOCK();
-    if (bytes_read == ADC_CONV_FRAME_SIZE) {
+    if (bytes_read == I2S_CAPTURE_FRAME_BYTES) {
         g_audio.stats.capture_frames_ok++;
     } else {
         g_audio.stats.capture_short_reads++;
@@ -251,17 +216,15 @@ static uint32_t read_adc_frame(uint8_t *adc_buffer, size_t buffer_size)
 void audio_capture_task(void *arg)
 {
     (void)arg;
-    static uint8_t adc_buffer[ADC_CONV_FRAME_SIZE];
+    static int32_t i2s_buffer[AUDIO_FRAME_SAMPLES * I2S_CAPTURE_CHANNELS];
     static int16_t silence_frame[AUDIO_FRAME_SAMPLES];
     int64_t encode_time_sum = 0;
     int64_t latency_sum = 0;
 
-    atomic_store_explicit(&g_audio.adc_notify_task, xTaskGetCurrentTaskHandle(),
-                          memory_order_release);
     opus_encoder_ctl(g_audio.opus_encoder, OPUS_RESET_STATE);
-    esp_err_t ret = adc_continuous_start(g_audio.adc_handle);
+    esp_err_t ret = i2s_channel_enable(g_audio.rx_chan);
     if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to start ADC: %s", esp_err_to_name(ret));
+        ESP_LOGE(TAG, "Failed to enable I2S RX: %s", esp_err_to_name(ret));
         atomic_store_explicit(&g_audio.running, false, memory_order_release);
         xSemaphoreGive(g_audio.capture_started);
         capture_task_finish();
@@ -276,12 +239,13 @@ void audio_capture_task(void *arg)
         g_audio.stats.task_loops++;
         AUDIO_STATS_UNLOCK();
 
-        uint32_t bytes_read = read_adc_frame(adc_buffer, sizeof(adc_buffer));
+        size_t bytes_read = read_i2s_frame(i2s_buffer, sizeof(i2s_buffer));
         if (bytes_read == 0) {
             continue;
         }
 
-        convert_adc_frame(adc_buffer, bytes_read / SOC_ADC_DIGI_RESULT_BYTES);
+        convert_i2s_frame(i2s_buffer,
+                          bytes_read / (I2S_CAPTURE_CHANNELS * sizeof(i2s_buffer[0])));
         if (g_audio.config.enable_hpf) {
             hpf_process(&g_audio.hpf, g_audio.pcm_input, AUDIO_FRAME_SAMPLES);
         }
@@ -299,7 +263,7 @@ void audio_capture_task(void *arg)
         record_frame_latency(frame_start_us, &latency_sum, encoded_frames);
     }
 
-    adc_continuous_stop(g_audio.adc_handle);
+    i2s_channel_disable(g_audio.rx_chan);
     ESP_LOGI(TAG, "Capture task stopped");
     capture_task_finish();
 }

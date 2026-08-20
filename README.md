@@ -46,7 +46,7 @@ Enough to get you started! Check [the wiring guide](docs/wiring.md) for details 
 - [x] **ESP32-S3**
 - [x] TDMA mesh protocol over [ESP-NOW](https://www.espressif.com/en/solutions/low-power-solutions/esp-now) (2.4 GHz)
 - [x] Opus low-bitrate voice
-- [x] Analog microphone via headphone jack
+- [x] INMP441 digital microphone via I2S
 - [x] Speaker output via headphone jack
 - [x] VOX for voice activation
 - [x] Configure ESP32 tx power to 20 dBm (100 mW) for ESP-NOW

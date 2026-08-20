@@ -357,9 +357,9 @@ static void log_audio_stats(void)
              stats.rx_pipe_us_max);
     ESP_LOGI(TAG, "  Latency: avg=%lu ms, max=%lu ms", stats.latency_ms_avg,
              stats.latency_ms_max);
-    ESP_LOGI(TAG, "  Glitches: %lu (rx_und=%lu i2s_inc=%lu), ADC overruns: %lu",
+    ESP_LOGI(TAG, "  Glitches: %lu (rx_und=%lu i2s_inc=%lu), I2S read errors: %lu",
              stats.glitches_detected, stats.rx_queue_underruns,
-             stats.i2s_write_incomplete, stats.adc_overruns);
+             stats.i2s_write_incomplete, stats.i2s_read_errors);
     ESP_LOGI(TAG,
              "  Concealment: plc=%lu grace_empty=%lu conceal=%lu seq_gap=%lu "
              "seq_reset=%lu seq_stale=%lu",
@@ -392,7 +392,7 @@ static void log_audio_stats(void)
              "pcm_underrun=%lu asrc_ppm=%ld asrc_abs_max_ppm=%lu asrc_recovery=%u "
              "playout_loops=%lu",
              stats.capture_frames_ok, stats.capture_short_reads, stats.capture_timeouts,
-             stats.adc_overruns, stats.frames_encoded, stats.encode_errors,
+             stats.i2s_read_errors, stats.frames_encoded, stats.encode_errors,
              stats.tx_dtx_suppressed, stats.rx_queue_overflows, stats.rx_lock_drops,
              stats.rx_source_rejections, stats.rx_source_evictions,
              stats.jitter_trim_frames, stats.frames_decoded,
@@ -448,8 +448,9 @@ static bool prepare_i2s_output(void)
 static void write_playout_frame(void)
 {
     for (size_t i = 0; i < AUDIO_FRAME_SAMPLES; ++i) {
-        g_audio.pcm_stereo[i * 2] = g_audio.pcm_output[i];
-        g_audio.pcm_stereo[i * 2 + 1] = g_audio.pcm_output[i];
+        int32_t sample = (int32_t)g_audio.pcm_output[i] << 16;
+        g_audio.pcm_stereo[i * 2] = sample;
+        g_audio.pcm_stereo[i * 2 + 1] = sample;
     }
     size_t bytes_written = 0;
     esp_err_t ret = i2s_channel_write(g_audio.tx_chan, g_audio.pcm_stereo,

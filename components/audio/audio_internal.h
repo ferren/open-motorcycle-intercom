@@ -4,7 +4,7 @@
  *
  * Module ownership:
  * - audio.c: lifecycle, configuration, public API guards, stats snapshots.
- * - audio_hw.c: ADC, I2S, and Opus codec resources.
+ * - audio_hw.c: I2S and Opus codec resources.
  * - audio_capture.c: capture task, DSP chain, encode, TX callback.
  * - audio_playout.c: playout task, decode, mixing, I2S writes, heartbeat.
  * - audio_rx.c: RX packet admission and source reset handshakes.
@@ -26,7 +26,6 @@
 #include <stdatomic.h>
 
 #include "driver/i2s_std.h"
-#include "esp_adc/adc_continuous.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
 #include "freertos/semphr.h"
@@ -47,10 +46,10 @@
 #define I2S_DMA_BUFFER_SIZE  320
 #define I2S_WRITE_TIMEOUT_MS 50
 
-#define AUDIO_FRAME_SAMPLES   320
-#define ADC_OVERSAMPLE_FACTOR 4
-#define ADC_CONV_FRAME_SIZE   (AUDIO_FRAME_SAMPLES * ADC_OVERSAMPLE_FACTOR * 4)
-#define ADC_READ_TIMEOUT_MS   100
+#define AUDIO_FRAME_SAMPLES      320
+#define I2S_CAPTURE_CHANNELS     2
+#define I2S_CAPTURE_FRAME_BYTES  (AUDIO_FRAME_SAMPLES * I2S_CAPTURE_CHANNELS * sizeof(int32_t))
+#define I2S_READ_TIMEOUT_MS      100
 
 #define MAX_OPUS_PACKET_SIZE      64
 #define OPUS_DTX_FRAME_MAX_BYTES  2
@@ -128,12 +127,11 @@ typedef struct {
 
     /* Hardware */
     i2s_chan_handle_t tx_chan;
-    adc_continuous_handle_t adc_handle;
+    i2s_chan_handle_t rx_chan;
 
     /* Tasks and handshakes */
     TaskHandle_t capture_task;
     TaskHandle_t playout_task;
-    _Atomic(TaskHandle_t) adc_notify_task;
     SemaphoreHandle_t playout_started;
     SemaphoreHandle_t capture_started;
     SemaphoreHandle_t capture_done;
@@ -148,15 +146,12 @@ typedef struct {
     audio_hpf_state_t hpf;
     vox_state_t vox;
     voice_cleanup_state_t voice_cleanup;
-    float dc_estimate;
-    int16_t lpf_prev;
-
     /* Frame buffers */
     int16_t pcm_input[AUDIO_FRAME_SAMPLES];
     uint8_t opus_buffer[MAX_OPUS_PACKET_SIZE];
     int16_t pcm_output[AUDIO_FRAME_SAMPLES];
-    int16_t pcm_stereo[AUDIO_FRAME_SAMPLES * 2];
-    int16_t i2s_silence[AUDIO_FRAME_SAMPLES * 2];
+    int32_t pcm_stereo[AUDIO_FRAME_SAMPLES * I2S_CAPTURE_CHANNELS];
+    int32_t i2s_silence[AUDIO_FRAME_SAMPLES * I2S_CAPTURE_CHANNELS];
     int16_t far_ref_frame[AUDIO_FRAME_SAMPLES];
     int16_t far_ref_shadows[I2S_DMA_BUFFER_COUNT][AUDIO_FRAME_SAMPLES];
     size_t far_ref_shadow_head;
@@ -186,8 +181,6 @@ audio_stats_t audio_stats_snapshot(void);
 bool audio_called_from_worker(void);
 
 /* audio_hw.c */
-esp_err_t audio_hw_adc_init(const audio_config_t *config);
-void audio_hw_adc_deinit(void);
 esp_err_t audio_hw_i2s_init(const audio_config_t *config);
 void audio_hw_i2s_deinit(void);
 esp_err_t audio_hw_opus_init(const audio_config_t *config);

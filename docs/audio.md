@@ -20,31 +20,28 @@ The audio component accepts one format:
 | Samples per frame | 320 |
 | Maximum encoded frame | 64 bytes |
 
-The playout interface is stereo I2S, but each mono output sample is copied to
-both channels.
+The I2S bus uses 32-bit stereo slots. The microphone supplies the left input
+slot; each mono playout sample is expanded and copied to both output slots.
 
 ---
 
 ## 2. Hardware I/O
 
-### Analog capture
+### INMP441 I2S capture
 
-The implemented microphone path is ADC capture, not I2S microphone input. The
-default is ADC1 channel 0 on **GPIO1**, with `ADC_ATTEN_DB_12` attenuation for an
-active analog microphone such as the MAX9814. The ADC runs at 64 ksample/s;
-four conversions are averaged for each 16 kHz PCM sample.
+The ESP32-S3 uses I2S0 in full-duplex Philips mode. It outputs 16 kHz BCLK and
+WS on **GPIO4** and **GPIO5**; the INMP441 drives its data pin to **GPIO6**.
+The hardware uses 32-bit stereo slots (64 BCLK per sample frame). With the
+INMP441 L/R pin grounded, its 24-bit left-slot sample is sign-extended down to
+the upper 16 bits for the mono Opus input.
 
-Capture then applies DC removal, a simple low-pass filter, and an enabled-by-
-default 80 Hz high-pass filter. In mesh mode it also applies the current
-far-reference echo subtraction and noise-gain stage before VOX and encoding.
-
-`GPIO6` remains in the default pin structure as I2S DIN, but the current driver
-does not create an I2S RX channel. Using an INMP441 therefore requires code
-changes. See the [wiring guide](wiring.md#prototype-microphone-input).
+Capture applies the enabled-by-default 80 Hz high-pass filter. In mesh mode it
+also applies the current far-reference echo subtraction and noise-gain stage
+before VOX and encoding. See the [wiring guide](wiring.md#i2s-digital-microphone-inmp441).
 
 ### I2S output
 
-The ESP32-S3 is the I2S master and transmits Philips-format, 16-bit stereo at
+The ESP32-S3 is the I2S master and transmits Philips-format, 32-bit stereo at
 16 kHz:
 
 | Signal | GPIO |
@@ -62,8 +59,8 @@ with silence before output starts. See the [audio output wiring](wiring.md#proto
 
 ```mermaid
 flowchart LR
-    ADC["ADC1 GPIO1<br/>64 ksample/s"] --> AVG["4x average<br/>16 kHz mono"]
-    AVG --> FILTER["DC removal<br/>LPF + 80 Hz HPF"]
+    MIC["INMP441 GPIO6<br/>I2S RX"] --> CONVERT["Left slot<br/>16 kHz mono"]
+    CONVERT --> FILTER["80 Hz HPF"]
     FILTER --> CLEAN["Mesh mode:<br/>echo/noise cleanup"]
     CLEAN --> VOX["RMS VOX"]
     VOX --> OPUS["Opus<br/>320 samples"]
@@ -276,7 +273,7 @@ Use synchronized external stimulus and output capture for a real latency result.
 
 The audio heartbeat and `PIPE ... stage=audio` logs expose:
 
-- complete, short, timed-out, and failed/overrun ADC captures;
+- complete, short, timed-out, and failed I2S microphone captures;
 - encoded frames, encode errors and timing, and suppressed DTX frames;
 - decoded frames, decode errors and timing, DTX PLC calls, concealed losses,
   sequence holes, sequence resets, and stale drops;

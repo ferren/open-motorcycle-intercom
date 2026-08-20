@@ -22,7 +22,10 @@ ground and require an adapter.
 
 ## Prototype Microphone Input
 
-### (Recommended) Analog Microphone via TRRS (ADC)
+### Legacy Analog Microphone via TRRS (ADC)
+
+The default firmware now uses the INMP441 I2S path below. This analog MAX9814
+wiring is retained as hardware reference only and requires an ADC capture backend.
 
 Use a MAX9814 breakout to amplify an analog electret microphone before the
 ESP32-S3 ADC. Common MAX9814 breakouts include an onboard electret microphone:
@@ -63,7 +66,9 @@ The original design planned for an INMP441 I2S digital microphone. If switching 
 | **VDD**     | **3.3V**     | Power |
 | **GND**     | **GND**      | Ground |
 
-**Note:** Code changes required to switch from ADC to I2S RX mode.
+The firmware uses I2S0 full duplex at 16 kHz with 32-bit stereo slots: ESP32-S3
+drives BCLK/WS, INMP441 drives GPIO6, and the left-channel sample is converted
+to the 16-bit mono Opus input. The MAX98357A output may share GPIO4 and GPIO5.
 
 
 ## Prototype Audio Output
@@ -106,10 +111,9 @@ The MAX98357A is a mono I2S Class-D amplifier. It connects to the ESP32-S3 via t
 Connect SPK+ and SPK- to your speaker. Speaker impedance should be 4-8 Ohms,
 and the speaker should be 0.5W to 3W for best results.
 
-The current firmware emits standard Philips-format I2S on the same BCLK, WS, and
-DOUT pins used by both modules. A standard-I2S MAX98357A therefore needs no
-firmware pin-mode change; configure only the module's gain/channel hardware as
-needed.
+The firmware emits standard Philips-format full-duplex I2S on the same BCLK, WS,
+and DOUT pins. A standard-I2S MAX98357A therefore needs no firmware pin-mode
+change; configure only the module's gain/channel hardware as needed.
 
 ## (Optional, Recommended) nRF52840 Mesh Radio (XIAO)
 

@@ -16,7 +16,7 @@ This will get you started, together with **cables** and **soldering tools**:
 |------|-------|
 | ESP32-S3-DevKitC-1-N8 or compatible | 8 MB flash; PSRAM is not required or enabled |
 | PCM5102A breakout | Recommended I2S audio output for a prototype |
-| MAX9814 breakout | Recommended analog microphone input for a prototype |
+| INMP441 breakout | I2S digital microphone input for a prototype |
 | CTIA TRRS 3.5mm jack | For headset audio and microphone connections |
 | A TRRS/TRS microphone headset | For testing audio |
 | Powered headphones or an amplified speaker | A passive speaker needs a separate amplifier |

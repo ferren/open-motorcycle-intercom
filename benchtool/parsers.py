@@ -117,7 +117,7 @@ ESP_CRC_WARN_RE = re.compile(r"crc_fail=(?P<crc_fail>\d+)")
 
 ESP_AUDIO_GLITCH_RE = re.compile(
     r"Glitches:\s*(?P<glitches>\d+)\s*\(rx_und=(?P<rx_und>\d+)\s+"
-    r"i2s_inc=(?P<i2s_inc>\d+)\),\s*ADC overruns:\s*(?P<adc_overruns>\d+)"
+    r"i2s_inc=(?P<i2s_inc>\d+)\),\s*I2S read errors:\s*(?P<i2s_read_errors>\d+)"
 )
 
 ESP_AUDIO_CONCEAL_RE = re.compile(

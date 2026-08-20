@@ -234,6 +234,19 @@ class PipelineLogTest(unittest.TestCase):
             {"rx_q_min": 1, "rx_q_avg": 4, "rx_q_max": 7, "rx_q_total": 12},
         )
 
+    def test_parses_i2s_microphone_read_errors(self):
+        stats = PortStats(port="test")
+        reader = PortReader("test", 115200, None, "unused", stats)
+        reader._parse_line(
+            "I (123456) audio:   Glitches: 4 (rx_und=2 i2s_inc=1), "
+            "I2S read errors: 3"
+        )
+
+        self.assertEqual(
+            stats.last_glitch,
+            {"glitches": 4, "rx_und": 2, "i2s_inc": 1, "i2s_read_errors": 3},
+        )
+
     def test_parses_current_concealment_line_with_loss_fields(self):
         stats = PortStats(port="test")
         reader = PortReader("test", 115200, None, "unused", stats)

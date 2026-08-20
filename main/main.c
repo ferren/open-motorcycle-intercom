@@ -318,7 +318,7 @@ static void log_system_health(int64_t now_ms, int64_t boot_time)
 static void select_transport(void)
 {
     /* Detect mesh transport BEFORE audio init.
-     * SPI slave needs a GDMA channel - if audio (I2S + ADC) initializes
+     * SPI slave needs a GDMA channel - if audio (I2S full duplex) initializes
      * first, it may exhaust all available DMA channels. */
     ESP_LOGI(TAG, "");
     ESP_LOGI(TAG, "Detecting mesh transport...");

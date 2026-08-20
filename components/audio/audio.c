@@ -103,27 +103,20 @@ static esp_err_t audio_init_with_config_locked(const audio_config_t *config)
     }
     g_audio.config = requested;
 
-    esp_err_t ret = audio_hw_adc_init(&g_audio.config);
+    esp_err_t ret = audio_hw_i2s_init(&g_audio.config);
     if (ret != ESP_OK) {
-        return ret;
-    }
-    ret = audio_hw_i2s_init(&g_audio.config);
-    if (ret != ESP_OK) {
-        audio_hw_adc_deinit();
         return ret;
     }
     ret = audio_hw_opus_init(&g_audio.config);
     if (ret != ESP_OK) {
         audio_hw_opus_deinit();
         audio_hw_i2s_deinit();
-        audio_hw_adc_deinit();
         return ret;
     }
     ret = create_sync_resources();
     if (ret != ESP_OK) {
         audio_hw_opus_deinit();
         audio_hw_i2s_deinit();
-        audio_hw_adc_deinit();
         return ret;
     }
 
@@ -225,7 +218,6 @@ esp_err_t audio_deinit(void)
     audio_rx_reset_source_metadata();
     audio_hw_opus_deinit();
     audio_hw_i2s_deinit();
-    audio_hw_adc_deinit();
     delete_sync_resources();
     g_audio.initialized = false;
     g_audio.deinitializing = false;
