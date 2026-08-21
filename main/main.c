@@ -45,6 +45,12 @@ static const char *TAG = "omi";
  * decoder and I2S speaker output. Set to 0 for normal mesh operation. */
 #define LOCAL_AUDIO_LOOPBACK_FOR_TEST 0
 
+/* INMP441 breakout boards produce a lower RMS level than the legacy analog
+ * microphone path. Keep VOX enabled for normal intercom use, but calibrate it
+ * for the digital microphone so ordinary speech is sent to the mesh. */
+#define INMP441_VOX_ACTIVATION_THRESHOLD   0.005f
+#define INMP441_VOX_DEACTIVATION_THRESHOLD 0.002f
+
 /* RTT log cadence while using nRF transport */
 #define RTT_LOG_INTERVAL_MS 10000
 
@@ -125,6 +131,8 @@ static esp_err_t init_audio_with_test_flags(void)
 {
     audio_config_t audio_cfg = AUDIO_CONFIG_DEFAULT();
     audio_cfg.force_tx_always = (FORCE_TX_ALWAYS_FOR_TEST != 0);
+    audio_cfg.vox_config.activation_threshold = INMP441_VOX_ACTIVATION_THRESHOLD;
+    audio_cfg.vox_config.deactivation_threshold = INMP441_VOX_DEACTIVATION_THRESHOLD;
     return audio_init_with_config(&audio_cfg);
 }
 
