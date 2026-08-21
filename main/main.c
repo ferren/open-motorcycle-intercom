@@ -39,11 +39,11 @@ static const char *TAG = "omi";
 
 /* Test knob: bypass VOX gating and always transmit microphone frames.
  * 0 = normal VOX behavior (DTX silence suppression active), 1 = force continuous TX. */
-#define FORCE_TX_ALWAYS_FOR_TEST 1
+#define FORCE_TX_ALWAYS_FOR_TEST 0
 
 /* Bench-test knob: route the encoded microphone stream through the local Opus
  * decoder and I2S speaker output. Set to 0 for normal mesh operation. */
-#define LOCAL_AUDIO_LOOPBACK_FOR_TEST 1
+#define LOCAL_AUDIO_LOOPBACK_FOR_TEST 0
 
 /* RTT log cadence while using nRF transport */
 #define RTT_LOG_INTERVAL_MS 10000
