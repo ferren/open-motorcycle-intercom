@@ -120,7 +120,8 @@ static audio_packet_store_push_result_t push_packet_locked(audio_rx_source_t *so
             result = reanchor_result;
         }
     }
-    if (result == AUDIO_PACKET_STORE_PUSH_OK) {
+    if (result == AUDIO_PACKET_STORE_PUSH_OK ||
+        result == AUDIO_PACKET_STORE_PUSH_REPLACED) {
         source->last_enqueue_ms = now_ms;
     }
     return result;
@@ -135,7 +136,12 @@ static esp_err_t record_push_result(audio_packet_store_push_result_t result, boo
         g_audio.stats.seq_resets++;
         g_audio.stats.glitches_detected++;
     }
-    if (result != AUDIO_PACKET_STORE_PUSH_OK) {
+    if (result == AUDIO_PACKET_STORE_PUSH_REPLACED) {
+        /* The newest frame was accepted; count only the stale backlog loss. */
+        g_audio.stats.rx_queue_overflows++;
+        g_audio.stats.frames_dropped +=
+            AUDIO_PACKET_STORE_CAPACITY - AUDIO_PACKET_STORE_RECOVERY_PACKETS;
+    } else if (result != AUDIO_PACKET_STORE_PUSH_OK) {
         g_audio.stats.frames_dropped++;
         switch (result) {
         case AUDIO_PACKET_STORE_PUSH_DUPLICATE:

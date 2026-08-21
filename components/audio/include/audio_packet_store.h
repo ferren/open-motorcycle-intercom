@@ -12,6 +12,8 @@
 #define AUDIO_PACKET_STORE_FRAME_MS 20u
 #define AUDIO_PACKET_STORE_LATE_GRACE_MS 40u
 #define AUDIO_PACKET_STORE_EMPTY_MISSING_LIMIT 5u
+/* When arrival-order input falls behind, retain only a short live prefill. */
+#define AUDIO_PACKET_STORE_RECOVERY_PACKETS (AUDIO_PACKET_STORE_PREFILL_PACKETS + 1u)
 
 _Static_assert(AUDIO_PACKET_STORE_CAPACITY < UINT16_C(0x8000),
                "packet store capacity must stay below the sequence half range");
@@ -38,7 +40,9 @@ typedef enum {
     AUDIO_PACKET_STORE_PUSH_LATE,
     AUDIO_PACKET_STORE_PUSH_MODE_MISMATCH,
     AUDIO_PACKET_STORE_PUSH_FUTURE,
-    AUDIO_PACKET_STORE_PUSH_FULL
+    AUDIO_PACKET_STORE_PUSH_FULL,
+    /* Packet accepted after discarding stale arrival-order backlog. */
+    AUDIO_PACKET_STORE_PUSH_REPLACED
 } audio_packet_store_push_result_t;
 
 typedef enum {

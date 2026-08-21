@@ -78,6 +78,7 @@ audio_packet_store_push_result_t audio_packet_store_push(audio_packet_store_t *s
                                                          uint64_t now_ms)
 {
     size_t slot;
+    bool replaced = false;
 
     if (store == NULL || packet == NULL || !audio_packet_mode_valid(packet->mode)) {
         return AUDIO_PACKET_STORE_PUSH_INVALID_ARGUMENT;
@@ -90,7 +91,16 @@ audio_packet_store_push_result_t audio_packet_store_push(audio_packet_store_t *s
     }
     if (packet->mode == AUDIO_PACKET_MODE_ARRIVAL_ORDER) {
         if (store->depth == AUDIO_PACKET_STORE_CAPACITY) {
-            return AUDIO_PACKET_STORE_PUSH_FULL;
+            /* Live audio is more useful than a growing history.  A burst can
+             * otherwise leave playout permanently behind and make all new
+             * speech inaudible.  Keep just enough packets to restart cleanly. */
+            while (store->depth > AUDIO_PACKET_STORE_RECOVERY_PACKETS) {
+                store->occupied[store->arrival_head] = false;
+                store->arrival_head =
+                    (store->arrival_head + 1u) % AUDIO_PACKET_STORE_CAPACITY;
+                --store->depth;
+            }
+            replaced = true;
         }
         slot = store->arrival_tail;
         store->packets[slot] = *packet;
@@ -160,7 +170,7 @@ audio_packet_store_push_result_t audio_packet_store_push(audio_packet_store_t *s
         store->prefill_deadline_ms = now_ms + AUDIO_PACKET_STORE_PREFILL_MS;
     }
     ++store->depth;
-    return AUDIO_PACKET_STORE_PUSH_OK;
+    return replaced ? AUDIO_PACKET_STORE_PUSH_REPLACED : AUDIO_PACKET_STORE_PUSH_OK;
 }
 
 static audio_packet_store_pop_result_t audio_packet_store_pop_arrival(audio_packet_store_t *store,

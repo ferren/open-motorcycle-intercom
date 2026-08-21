@@ -448,6 +448,28 @@ static void test_arrival_order(void)
     assert(audio_packet_store_pop(&store, 100u, &output) == AUDIO_PACKET_STORE_POP_DTX_IDLE);
 }
 
+static void test_arrival_order_overflow_keeps_latest_audio(void)
+{
+    audio_packet_store_t store;
+    audio_packet_t value;
+    uint16_t sequence;
+
+    audio_packet_store_reset(&store);
+    for (sequence = 0u; sequence < AUDIO_PACKET_STORE_CAPACITY; ++sequence) {
+        value = packet(sequence, AUDIO_PACKET_MODE_ARRIVAL_ORDER, true);
+        assert(audio_packet_store_push(&store, &value, 0u) == AUDIO_PACKET_STORE_PUSH_OK);
+    }
+
+    value = packet(sequence, AUDIO_PACKET_MODE_ARRIVAL_ORDER, true);
+    assert(audio_packet_store_push(&store, &value, 0u) == AUDIO_PACKET_STORE_PUSH_REPLACED);
+    assert(audio_packet_store_depth(&store) == AUDIO_PACKET_STORE_RECOVERY_PACKETS + 1u);
+
+    for (sequence = AUDIO_PACKET_STORE_CAPACITY - AUDIO_PACKET_STORE_RECOVERY_PACKETS;
+         sequence <= AUDIO_PACKET_STORE_CAPACITY; ++sequence) {
+        expect_packet(&store, 0u, sequence);
+    }
+}
+
 static void test_mode_mismatch_reset_and_lengths(void)
 {
     audio_packet_store_t store;
@@ -500,6 +522,7 @@ int main(void)
     test_buffered_six_frame_burst_loss();
     test_lost_dtx_transition_wrap();
     test_arrival_order();
+    test_arrival_order_overflow_keeps_latest_audio();
     test_mode_mismatch_reset_and_lengths();
     puts("audio_packet_store tests passed");
     return 0;
