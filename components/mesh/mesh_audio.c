@@ -130,7 +130,7 @@ void send_speaker_release_for(uint8_t speaker_id)
         .speaker_ids = {speaker_id, 0},
     };
 
-    (void)send_packet(MESH_PKT_SPEAKER_RELEASE, &payload, sizeof(payload));
+    (void)mesh_send_packet(MESH_PKT_SPEAKER_RELEASE, &payload, sizeof(payload));
 }
 
 void update_speaker_grants(void)
@@ -197,7 +197,7 @@ void update_speaker_grants(void)
         }
     }
 
-    (void)send_packet(MESH_PKT_SPEAKER_GRANT, &payload, sizeof(payload));
+    (void)mesh_send_packet(MESH_PKT_SPEAKER_GRANT, &payload, sizeof(payload));
 }
 void clear_transient_mesh_state(void)
 {

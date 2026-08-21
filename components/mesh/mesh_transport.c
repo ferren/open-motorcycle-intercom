@@ -327,13 +327,13 @@ void esp_now_send_cb(const esp_now_send_info_t *send_info, esp_now_send_status_t
     taskEXIT_CRITICAL(&s_transport_mux);
     xSemaphoreGive(s_tx_done_semaphore);
 }
-esp_err_t send_packet(mesh_pkt_type_t type, const void *payload, uint16_t len)
+esp_err_t mesh_send_packet(mesh_pkt_type_t type, const void *payload, uint16_t len)
 {
     return enqueue_control_packet(type, payload, len, s_broadcast_mac);
 }
 
-esp_err_t send_packet_immediate(mesh_pkt_type_t type, const void *payload, uint16_t len,
-                                       const uint8_t *dest_mac)
+esp_err_t mesh_send_packet_immediate(mesh_pkt_type_t type, const void *payload, uint16_t len,
+                                     const uint8_t *dest_mac)
 {
     if (len > sizeof(s_control_queue[0].data) - sizeof(mesh_header_t) ||
         (len > 0 && payload == NULL) || dest_mac == NULL) {
@@ -546,7 +546,7 @@ esp_err_t send_sync(void)
     };
     memcpy(payload.coordinator_addr, s_local_mac, sizeof(payload.coordinator_addr));
 
-    return send_packet_immediate(MESH_PKT_SYNC, &payload, sizeof(payload), s_broadcast_mac);
+    return mesh_send_packet_immediate(MESH_PKT_SYNC, &payload, sizeof(payload), s_broadcast_mac);
 }
 
 esp_err_t send_keepalive(void)
@@ -556,7 +556,7 @@ esp_err_t send_keepalive(void)
         .reserved = 0,
     };
 
-    return send_packet(MESH_PKT_KEEPALIVE, &payload, sizeof(payload));
+    return mesh_send_packet(MESH_PKT_KEEPALIVE, &payload, sizeof(payload));
 }
 
 esp_err_t send_slot_map(void)
@@ -584,7 +584,7 @@ esp_err_t send_slot_map(void)
     memcpy(payload.active_speaker_ids, sm_ids, sizeof(payload.active_speaker_ids));
     memcpy(payload.relay_masks, sm_masks, sizeof(payload.relay_masks));
 
-    return send_packet(MESH_PKT_SLOT_MAP, &payload, sizeof(payload));
+    return mesh_send_packet(MESH_PKT_SLOT_MAP, &payload, sizeof(payload));
 }
 
 esp_err_t send_status(void)
@@ -612,7 +612,7 @@ esp_err_t send_status(void)
         }
     }
 
-    esp_err_t ret = send_packet(MESH_PKT_STATUS, &payload, sizeof(payload));
+    esp_err_t ret = mesh_send_packet(MESH_PKT_STATUS, &payload, sizeof(payload));
     if (ret != ESP_OK) {
         taskENTER_CRITICAL(&s_speaker_mux);
         s_heard_bitmap |= heard_bitmap;

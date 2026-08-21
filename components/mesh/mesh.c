@@ -336,7 +336,8 @@ esp_err_t mesh_stop(void)
     }
 
     if (was_active && !force_transport_cleanup) {
-        esp_err_t leave_ret = send_packet_immediate(MESH_PKT_LEAVE, NULL, 0, s_broadcast_mac);
+        esp_err_t leave_ret =
+            mesh_send_packet_immediate(MESH_PKT_LEAVE, NULL, 0, s_broadcast_mac);
         if (leave_ret != ESP_OK) {
             result = leave_ret;
         } else if (!wait_for_tx_idle(pdMS_TO_TICKS(TX_QUIESCE_TIMEOUT_MS))) {

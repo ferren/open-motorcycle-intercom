@@ -304,8 +304,9 @@ esp_err_t enqueue_control_packet(uint8_t type, const void *payload, uint16_t len
 bool dequeue_control_packet(control_tx_item_t *item);
 void reset_control_queue(void);
 void mesh_transport_restore_status_bitmaps(const control_tx_item_t *item);
-esp_err_t send_packet(mesh_pkt_type_t type, const void *payload, uint16_t len);
-esp_err_t send_packet_immediate(mesh_pkt_type_t type, const void *payload, uint16_t len, const uint8_t *dest_mac);
+esp_err_t mesh_send_packet(mesh_pkt_type_t type, const void *payload, uint16_t len);
+esp_err_t mesh_send_packet_immediate(mesh_pkt_type_t type, const void *payload, uint16_t len,
+                                     const uint8_t *dest_mac);
 esp_err_t tracked_esp_now_send(const uint8_t *dest_mac, uint8_t *data, size_t len, uint8_t type, uint8_t heard_bitmap, uint8_t relay_bitmap, uint8_t *sequence, bool audio_origin);
 bool wait_for_tx_idle(TickType_t timeout_ticks);
 bool wait_for_rx_quiesced(TickType_t timeout_ticks);
